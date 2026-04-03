@@ -11,24 +11,33 @@ pub fn mix_streams(a: &[f32], b: &[f32]) -> Vec<f32> {
     out
 }
 
-/// Linear interpolation resample. For same rate, returns a clone.
-pub fn resample(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+/// Linear interpolation resample for interleaved stereo audio.
+/// Resamples each channel independently to avoid cross-channel interpolation artifacts.
+/// For same rate, returns a clone.
+pub fn resample(input: &[f32], from_rate: u32, to_rate: u32, channels: u16) -> Vec<f32> {
     if from_rate == to_rate || input.is_empty() {
         return input.to_vec();
     }
 
+    let ch = channels as usize;
+    let num_frames = input.len() / ch;
     let ratio = from_rate as f64 / to_rate as f64;
-    let out_len = ((input.len() as f64) / ratio).round() as usize;
-    let mut output = Vec::with_capacity(out_len);
+    let out_frames = ((num_frames as f64) / ratio).round() as usize;
+    let mut output = Vec::with_capacity(out_frames * ch);
 
-    for i in 0..out_len {
-        let src_pos = i as f64 * ratio;
+    for frame in 0..out_frames {
+        let src_pos = frame as f64 * ratio;
         let idx = src_pos as usize;
         let frac = (src_pos - idx as f64) as f32;
 
-        let s0 = input[idx.min(input.len() - 1)];
-        let s1 = input[(idx + 1).min(input.len() - 1)];
-        output.push(s0 + frac * (s1 - s0));
+        let idx0 = idx.min(num_frames - 1);
+        let idx1 = (idx + 1).min(num_frames - 1);
+
+        for c in 0..ch {
+            let s0 = input[idx0 * ch + c];
+            let s1 = input[idx1 * ch + c];
+            output.push(s0 + frac * (s1 - s0));
+        }
     }
 
     output

@@ -42,6 +42,15 @@ impl Recorder {
     }
 }
 
+impl Drop for Recorder {
+    fn drop(&mut self) {
+        self.stop_flag.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.thread_handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
 fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, String> {
     fs::create_dir_all(&config.output_dir).map_err(|e| format!("create dir: {e}"))?;
 
@@ -125,7 +134,7 @@ fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, 
 
         // Resample mic if needed
         let mic_final = if need_resample && !mic_stereo.is_empty() {
-            mixer::resample(&mic_stereo, mic_rate, out_rate)
+            mixer::resample(&mic_stereo, mic_rate, out_rate, 2)
         } else {
             mic_stereo
         };
@@ -152,9 +161,16 @@ fn to_stereo(samples: &[f32], channels: u16) -> Vec<f32> {
     if samples.is_empty() {
         return Vec::new();
     }
-    if channels == 1 {
-        samples.iter().flat_map(|&s| [s, s]).collect()
-    } else {
-        samples.to_vec()
+    match channels {
+        1 => samples.iter().flat_map(|&s| [s, s]).collect(),
+        2 => samples.to_vec(),
+        n => {
+            // Downmix: take first two channels from each frame
+            let n = n as usize;
+            samples
+                .chunks_exact(n)
+                .flat_map(|frame| [frame[0], frame[1]])
+                .collect()
+        }
     }
 }

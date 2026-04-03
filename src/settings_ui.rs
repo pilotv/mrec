@@ -3,10 +3,13 @@ use crate::config::{AudioSource, Config};
 use native_windows_gui as nwg;
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::sync::Once;
+
+static NWG_INIT: Once = Once::new();
 
 /// Show a modal settings dialog. Returns updated Config if user clicks Save, None if Cancel.
 pub fn show_settings(current: &Config) -> Option<Config> {
-    nwg::init().expect("Failed to init NWG");
+    NWG_INIT.call_once(|| { nwg::init().expect("Failed to init NWG"); });
 
     let result: RefCell<Option<Config>> = RefCell::new(None);
     let config_clone = current.clone();

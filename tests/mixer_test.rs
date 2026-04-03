@@ -39,7 +39,7 @@ fn test_mix_clamps_output() {
 #[test]
 fn test_resample_double() {
     let input = vec![0.0f32, 1.0, 0.0, -1.0];
-    let output = mrec::mixer::resample(&input, 22050, 44100);
+    let output = mrec::mixer::resample(&input, 22050, 44100, 1);
 
     assert_eq!(output.len(), 8);
     assert!((output[0] - 0.0).abs() < 1e-6);
@@ -48,7 +48,7 @@ fn test_resample_double() {
 #[test]
 fn test_resample_same_rate_is_identity() {
     let input = vec![0.1f32, 0.2, 0.3, 0.4];
-    let output = mrec::mixer::resample(&input, 44100, 44100);
+    let output = mrec::mixer::resample(&input, 44100, 44100, 1);
     assert_eq!(output.len(), input.len());
     for (a, b) in output.iter().zip(input.iter()) {
         assert!((a - b).abs() < 1e-6);
