@@ -27,9 +27,13 @@ jobs:
 
       - name: Install vcpkg and mp3lame
         shell: bash
+        env:
+          VCPKG_ROOT: C:/vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
-          C:/vcpkg/bootstrap-vcpkg.bat
+          if [ ! -d "C:/vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
+            C:/vcpkg/bootstrap-vcpkg.bat
+          fi
           C:/vcpkg/vcpkg install mp3lame:x64-windows-static
 
       - name: Build release
