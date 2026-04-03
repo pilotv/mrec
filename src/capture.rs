@@ -1,5 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, SampleRate, Stream, StreamConfig};
+use cpal::{Device, Stream, StreamConfig};
 use crossbeam_channel::Sender;
 
 pub struct CaptureConfig {
@@ -21,7 +21,7 @@ pub fn loopback_device() -> Result<(Device, CaptureConfig), String> {
     Ok((
         device,
         CaptureConfig {
-            sample_rate: config.sample_rate().0,
+            sample_rate: config.sample_rate(),
             channels: config.channels(),
         },
     ))
@@ -63,7 +63,7 @@ pub fn microphone_device(name: Option<&str>) -> Result<(Device, CaptureConfig), 
     Ok((
         device,
         CaptureConfig {
-            sample_rate: config.sample_rate().0,
+            sample_rate: config.sample_rate(),
             channels: config.channels(),
         },
     ))
@@ -77,7 +77,7 @@ pub fn build_capture_stream(
 ) -> Result<Stream, String> {
     let stream_config = StreamConfig {
         channels: config.channels,
-        sample_rate: SampleRate(config.sample_rate),
+        sample_rate: config.sample_rate,
         buffer_size: cpal::BufferSize::Default,
     };
 

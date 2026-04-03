@@ -8,8 +8,8 @@ pub mod recorder;
 pub mod settings_ui;
 
 use config::Config;
-use muda::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use recorder::Recorder;
+use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIconBuilder};
 
 fn main() {
@@ -54,7 +54,7 @@ fn main() {
         unsafe {
             let mut msg: windows_sys::Win32::UI::WindowsAndMessaging::MSG = std::mem::zeroed();
             while windows_sys::Win32::UI::WindowsAndMessaging::PeekMessageW(
-                &mut msg, 0, 0, 0,
+                &mut msg, std::ptr::null_mut(), 0, 0,
                 windows_sys::Win32::UI::WindowsAndMessaging::PM_REMOVE,
             ) != 0
             {
@@ -137,7 +137,7 @@ fn show_error(msg: &str) {
 
     unsafe {
         windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW(
-            0,
+            std::ptr::null_mut(),
             wide_msg.as_ptr(),
             wide_title.as_ptr(),
             windows_sys::Win32::UI::WindowsAndMessaging::MB_OK

@@ -7,7 +7,6 @@ edition = "2021"
 cpal = "0.17"
 mp3lame-encoder = "0.2"
 tray-icon = "0.22"
-muda = "0.16"
 native-windows-gui = "1.0"
 windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
 crossbeam-channel = "0.5"

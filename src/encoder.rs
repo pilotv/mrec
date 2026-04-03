@@ -1,10 +1,11 @@
 use mp3lame_encoder::{Builder, Encoder, FlushNoGap, InterleavedPcm};
 use std::io::Write;
+use std::mem::MaybeUninit;
 
 pub struct Mp3Encoder<W: Write> {
     encoder: Encoder,
     writer: W,
-    mp3_buffer: Vec<u8>,
+    mp3_buffer: Vec<MaybeUninit<u8>>,
 }
 
 impl<W: Write> Mp3Encoder<W> {
@@ -33,7 +34,7 @@ impl<W: Write> Mp3Encoder<W> {
             .map_err(|e| format!("set_quality: {e:?}"))?;
 
         let encoder = builder.build().map_err(|e| format!("build encoder: {e:?}"))?;
-        let mp3_buffer = vec![0u8; 16384];
+        let mp3_buffer = vec![MaybeUninit::uninit(); 16384];
 
         Ok(Self {
             encoder,
@@ -53,7 +54,7 @@ impl<W: Write> Mp3Encoder<W> {
 
         let needed = (1.25 * pcm_i16.len() as f64) as usize + 7200;
         if self.mp3_buffer.len() < needed {
-            self.mp3_buffer.resize(needed, 0);
+            self.mp3_buffer.resize(needed, MaybeUninit::uninit());
         }
 
         let encoded_size = self
@@ -62,8 +63,11 @@ impl<W: Write> Mp3Encoder<W> {
             .map_err(|e| format!("encode: {e:?}"))?;
 
         if encoded_size > 0 {
+            let initialized = unsafe {
+                std::slice::from_raw_parts(self.mp3_buffer.as_ptr() as *const u8, encoded_size)
+            };
             self.writer
-                .write_all(&self.mp3_buffer[..encoded_size])
+                .write_all(initialized)
                 .map_err(|e| format!("write: {e}"))?;
         }
 
@@ -78,8 +82,11 @@ impl<W: Write> Mp3Encoder<W> {
             .map_err(|e| format!("flush: {e:?}"))?;
 
         if flushed_size > 0 {
+            let initialized = unsafe {
+                std::slice::from_raw_parts(self.mp3_buffer.as_ptr() as *const u8, flushed_size)
+            };
             self.writer
-                .write_all(&self.mp3_buffer[..flushed_size])
+                .write_all(initialized)
                 .map_err(|e| format!("write: {e}"))?;
         }
 

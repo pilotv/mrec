@@ -3,6 +3,7 @@ use crate::config::{AudioSource, Config};
 use native_windows_gui as nwg;
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Once;
 
 static NWG_INIT: Once = Once::new();
@@ -11,7 +12,7 @@ static NWG_INIT: Once = Once::new();
 pub fn show_settings(current: &Config) -> Option<Config> {
     NWG_INIT.call_once(|| { nwg::init().expect("Failed to init NWG"); });
 
-    let result: RefCell<Option<Config>> = RefCell::new(None);
+    let result: Rc<RefCell<Option<Config>>> = Rc::new(RefCell::new(None));
     let config_clone = current.clone();
 
     // Window
@@ -193,7 +194,8 @@ pub fn show_settings(current: &Config) -> Option<Config> {
 
     // Event handler
     let window_handle = window.handle;
-    let handler = nwg::full_bind_event_handler(&window.handle, move |evt, _evt_data, handle| {
+    let result_clone = Rc::clone(&result);
+    let handler = nwg::full_bind_event_handler(&window_handle, move |evt, _evt_data, handle| {
         match evt {
             nwg::Event::OnButtonClick => {
                 if handle == btn_browse.handle {
@@ -232,7 +234,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
                         microphone,
                         filename_template: txt_fname.text(),
                     };
-                    *result.borrow_mut() = Some(new_config);
+                    *result_clone.borrow_mut() = Some(new_config);
                     nwg::stop_thread_dispatch();
                 } else if handle == btn_cancel.handle {
                     nwg::stop_thread_dispatch();
@@ -250,5 +252,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     nwg::dispatch_thread_events();
     nwg::unbind_event_handler(&handler);
 
-    result.into_inner()
+    Rc::try_unwrap(result)
+        .ok()
+        .and_then(|cell| cell.into_inner())
 }
