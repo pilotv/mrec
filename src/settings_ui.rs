@@ -18,7 +18,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     // Window
     let mut window = nwg::Window::default();
     nwg::Window::builder()
-        .size((420, 380))
+        .size((420, 460))
         .position((300, 200))
         .title("mrec Settings")
         .flags(nwg::WindowFlags::WINDOW | nwg::WindowFlags::VISIBLE)
@@ -145,11 +145,67 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     };
     cmb_mic.set_selection(Some(mic_idx));
 
+    // --- System volume ---
+    let mut lbl_sysvol = nwg::Label::default();
+    nwg::Label::builder()
+        .text("System vol:")
+        .position((10, 175))
+        .size((100, 20))
+        .parent(&window)
+        .build(&mut lbl_sysvol)
+        .unwrap();
+
+    let vol_options = vec![
+        "50%".to_string(), "75%".to_string(), "100%".to_string(),
+        "125%".to_string(), "150%".to_string(),
+    ];
+    let vol_values: Vec<u32> = vec![50, 75, 100, 125, 150];
+
+    let mut cmb_sysvol = nwg::ComboBox::default();
+    nwg::ComboBox::builder()
+        .position((110, 172))
+        .size((100, 200))
+        .collection(vol_options.clone())
+        .parent(&window)
+        .build(&mut cmb_sysvol)
+        .unwrap();
+
+    let sysvol_idx = vol_values.iter().position(|&v| v == config_clone.system_volume).unwrap_or(2);
+    cmb_sysvol.set_selection(Some(sysvol_idx));
+
+    // --- Mic volume ---
+    let mut lbl_micvol = nwg::Label::default();
+    nwg::Label::builder()
+        .text("Mic vol:")
+        .position((10, 215))
+        .size((100, 20))
+        .parent(&window)
+        .build(&mut lbl_micvol)
+        .unwrap();
+
+    let mic_vol_options = vec![
+        "50%".to_string(), "75%".to_string(), "100%".to_string(),
+        "150%".to_string(), "200%".to_string(), "300%".to_string(),
+    ];
+    let mic_vol_values: Vec<u32> = vec![50, 75, 100, 150, 200, 300];
+
+    let mut cmb_micvol = nwg::ComboBox::default();
+    nwg::ComboBox::builder()
+        .position((110, 212))
+        .size((100, 200))
+        .collection(mic_vol_options.clone())
+        .parent(&window)
+        .build(&mut cmb_micvol)
+        .unwrap();
+
+    let micvol_idx = mic_vol_values.iter().position(|&v| v == config_clone.mic_volume).unwrap_or(3);
+    cmb_micvol.set_selection(Some(micvol_idx));
+
     // --- Filename template ---
     let mut lbl_fname = nwg::Label::default();
     nwg::Label::builder()
         .text("Filename:")
-        .position((10, 175))
+        .position((10, 255))
         .size((100, 20))
         .parent(&window)
         .build(&mut lbl_fname)
@@ -158,7 +214,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let mut txt_fname = nwg::TextInput::default();
     nwg::TextInput::builder()
         .text(&config_clone.filename_template)
-        .position((110, 172))
+        .position((110, 252))
         .size((300, 24))
         .parent(&window)
         .build(&mut txt_fname)
@@ -167,7 +223,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let mut lbl_hint = nwg::Label::default();
     nwg::Label::builder()
         .text("Placeholders: {date} = 2026-04-03, {time} = 15-30-00")
-        .position((110, 200))
+        .position((110, 280))
         .size((300, 20))
         .parent(&window)
         .build(&mut lbl_hint)
@@ -177,7 +233,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let mut btn_save = nwg::Button::default();
     nwg::Button::builder()
         .text("Save")
-        .position((220, 330))
+        .position((220, 410))
         .size((90, 32))
         .parent(&window)
         .build(&mut btn_save)
@@ -186,7 +242,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let mut btn_cancel = nwg::Button::default();
     nwg::Button::builder()
         .text("Cancel")
-        .position((320, 330))
+        .position((320, 410))
         .size((90, 32))
         .parent(&window)
         .build(&mut btn_cancel)
@@ -227,12 +283,21 @@ pub fn show_settings(current: &Config) -> Option<Config> {
                         Some(i) => mic_items.get(i).cloned(),
                     };
 
+                    let system_volume = cmb_sysvol.selection()
+                        .and_then(|i| vol_values.get(i).copied())
+                        .unwrap_or(100);
+                    let mic_volume = cmb_micvol.selection()
+                        .and_then(|i| mic_vol_values.get(i).copied())
+                        .unwrap_or(150);
+
                     let new_config = Config {
                         output_dir: PathBuf::from(txt_folder.text()),
                         bitrate,
                         audio_source,
                         microphone,
                         filename_template: txt_fname.text(),
+                        mic_volume,
+                        system_volume,
                     };
                     *result_clone.borrow_mut() = Some(new_config);
                     nwg::stop_thread_dispatch();

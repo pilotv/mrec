@@ -2,13 +2,13 @@
 fn test_mix_equal_length_streams() {
     let stream_a = vec![0.5f32, -0.5, 0.3, -0.3];
     let stream_b = vec![0.2f32, -0.2, 0.1, -0.1];
-    let mixed = mrec::mixer::mix_streams(&stream_a, &stream_b);
+    let mixed = mrec::mixer::mix_streams(&stream_a, &stream_b, 1.0, 1.0);
 
     assert_eq!(mixed.len(), 4);
     let expected: Vec<f32> = stream_a
         .iter()
         .zip(stream_b.iter())
-        .map(|(a, b)| (a + b).clamp(-1.0, 1.0))
+        .map(|(a, b)| (a * 1.0 + b * 1.0).clamp(-1.0, 1.0))
         .collect();
     for (got, exp) in mixed.iter().zip(expected.iter()) {
         assert!((got - exp).abs() < 1e-6, "got {got}, expected {exp}");
@@ -19,7 +19,7 @@ fn test_mix_equal_length_streams() {
 fn test_mix_different_length_pads_shorter() {
     let stream_a = vec![0.5f32, 0.5, 0.5, 0.5];
     let stream_b = vec![0.3f32, 0.3];
-    let mixed = mrec::mixer::mix_streams(&stream_a, &stream_b);
+    let mixed = mrec::mixer::mix_streams(&stream_a, &stream_b, 1.0, 1.0);
 
     assert_eq!(mixed.len(), 4);
     assert!((mixed[0] - 0.8).abs() < 1e-6);
@@ -30,7 +30,7 @@ fn test_mix_different_length_pads_shorter() {
 fn test_mix_clamps_output() {
     let stream_a = vec![0.9f32];
     let stream_b = vec![0.9f32];
-    let mixed = mrec::mixer::mix_streams(&stream_a, &stream_b);
+    let mixed = mrec::mixer::mix_streams(&stream_a, &stream_b, 1.0, 1.0);
 
     assert_eq!(mixed.len(), 1);
     assert!((mixed[0] - 1.0).abs() < 1e-6, "should clamp to 1.0");

@@ -22,7 +22,16 @@ pub struct Config {
     pub audio_source: AudioSource,
     pub microphone: Option<String>,
     pub filename_template: String,
+    /// Microphone volume: 50..300 (percent, 100 = normal)
+    #[serde(default = "default_mic_volume")]
+    pub mic_volume: u32,
+    /// System audio volume: 50..150 (percent, 100 = normal)
+    #[serde(default = "default_system_volume")]
+    pub system_volume: u32,
 }
+
+fn default_mic_volume() -> u32 { 150 }
+fn default_system_volume() -> u32 { 100 }
 
 impl Default for Config {
     fn default() -> Self {
@@ -38,6 +47,8 @@ impl Default for Config {
             audio_source: AudioSource::Both,
             microphone: None,
             filename_template: "mrec_{date}_{time}".to_string(),
+            mic_volume: default_mic_volume(),
+            system_volume: default_system_volume(),
         }
     }
 }

@@ -105,6 +105,10 @@ fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, 
     let mic_rate = mic.as_ref().map(|(_, c)| c.sample_rate).unwrap_or(out_rate);
     let need_resample = mic_rate != out_rate;
 
+    // Volume levels from config (percent → linear gain)
+    let system_vol = config.system_volume as f32 / 100.0;
+    let mic_vol = config.mic_volume as f32 / 100.0;
+
     // Fixed chunk size: 20ms worth of stereo samples at output rate
     // This ensures consistent timing between loopback and mic streams
     let chunk_samples = (out_rate as usize / 50) * 2; // 20ms * 2 channels
@@ -167,7 +171,7 @@ fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, 
         let output = if has_loopback && has_mic {
             let lb: Vec<f32> = loopback_accum.drain(..process_len).collect();
             let mc: Vec<f32> = mic_accum.drain(..process_len).collect();
-            mixer::mix_streams(&lb, &mc)
+            mixer::mix_streams(&lb, &mc, system_vol, mic_vol)
         } else if has_loopback {
             loopback_accum.drain(..process_len).collect()
         } else {
@@ -185,7 +189,7 @@ fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, 
         if len > 0 {
             let lb: Vec<f32> = loopback_accum.drain(..len).collect();
             let mc: Vec<f32> = mic_accum.drain(..len).collect();
-            mixer::mix_streams(&lb, &mc)
+            mixer::mix_streams(&lb, &mc, system_vol, mic_vol)
         } else if !loopback_accum.is_empty() {
             loopback_accum
         } else {
