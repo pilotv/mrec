@@ -1,40 +1,46 @@
-  on:                                                                                    
-    push:                                                                                                                                                                                      
-      branches:                                                                          
-        - master                                                                                                                                                                               
-    workflow_dispatch:                                                                                                                                                                       
-    build:                                                                                                                                                                                     
-      runs-on: windows-latest                                                                                                                                                                  
-      steps:                                                                                                                                                                                   
-        - uses: actions/checkout@v4                                                      
-                                                                                                                                                                                               
-        - name: Install Rust                                                             
-        - name: Cache cargo 
-          uses: actions/cache@v4                                                                                                                                                               
-          with:                                                                          
-            path: |           
-              ~/.cargo/registry 
-              ~/.cargo/git       
-              target       
-            key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
-            restore-keys: ${{ runner.os }}-cargo-
-                            
-        - name: Install vcpkg and mp3lame                                                                                                                                                      
-          shell: bash         
-          run: |                                                                                                                                                                               
-            git clone https://github.com/microsoft/vcpkg.git C:/vcpkg                    
-            C:/vcpkg/bootstrap-vcpkg.bat
-            C:/vcpkg/vcpkg install mp3lame:x64-windows-static
-                                    
-        - name: Build release          
-          shell: bash         
-          env:                                                                                                                                                                                 
-            VCPKG_ROOT: C:/vcpkg 
-            VCPKGRS_DYNAMIC: "0"                                                                                                                                                               
-          run: cargo build --release                                                     
-                                       
-        - name: Upload artifact
-          uses: actions/upload-artifact@v4                                                                                                                                                     
-          with:                 
-            name: mrec-windows                                                                                                                                                                 
-            path: target/release/mrec.exe                                              
+name: Build Windows Release
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install vcpkg and mp3lame
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
+          C:/vcpkg/bootstrap-vcpkg.bat
+          C:/vcpkg/vcpkg install mp3lame:x64-windows-static
+
+      - name: Build release
+        shell: bash
+        env:
+          VCPKG_ROOT: C:/vcpkg
+          VCPKGRS_DYNAMIC: "0"
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mrec-windows
+          path: target/release/mrec.exe
