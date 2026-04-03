@@ -105,52 +105,100 @@ fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, 
     let mic_rate = mic.as_ref().map(|(_, c)| c.sample_rate).unwrap_or(out_rate);
     let need_resample = mic_rate != out_rate;
 
+    // Fixed chunk size: 20ms worth of stereo samples at output rate
+    // This ensures consistent timing between loopback and mic streams
+    let chunk_samples = (out_rate as usize / 50) * 2; // 20ms * 2 channels
+
+    // Accumulation buffers for steady chunk-based processing
+    let mut loopback_accum: Vec<f32> = Vec::with_capacity(chunk_samples * 2);
+    let mut mic_accum: Vec<f32> = Vec::with_capacity(chunk_samples * 2);
+
     // Recording loop
     while !stop_flag.load(Ordering::Relaxed) {
-        let mut loopback_buf = Vec::new();
+        // Drain available loopback samples into accumulator
         loop {
             match loopback_rx.try_recv() {
-                Ok(data) => loopback_buf.extend(data),
+                Ok(data) => {
+                    let stereo = to_stereo(&data, loopback_channels);
+                    loopback_accum.extend(stereo);
+                }
                 Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
             }
         }
 
-        let mut mic_buf = Vec::new();
+        // Drain available mic samples into accumulator
         loop {
             match mic_rx.try_recv() {
-                Ok(data) => mic_buf.extend(data),
+                Ok(data) => {
+                    let stereo = to_stereo(&data, mic_cfg_channels);
+                    let resampled = if need_resample {
+                        mixer::resample(&stereo, mic_rate, out_rate, 2)
+                    } else {
+                        stereo
+                    };
+                    mic_accum.extend(resampled);
+                }
                 Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
             }
         }
 
-        if loopback_buf.is_empty() && mic_buf.is_empty() {
-            thread::sleep(std::time::Duration::from_millis(10));
+        // Process full chunks
+        let has_loopback = _loopback_stream.is_some();
+        let has_mic = _mic_stream.is_some();
+
+        // Determine how many samples we can process this iteration
+        let available = if has_loopback && has_mic {
+            // Both sources: process the minimum available (keeps them in sync)
+            loopback_accum.len().min(mic_accum.len())
+        } else if has_loopback {
+            loopback_accum.len()
+        } else {
+            mic_accum.len()
+        };
+
+        // Only process full chunks (aligned to stereo frames)
+        let process_len = (available / chunk_samples) * chunk_samples;
+
+        if process_len == 0 {
+            thread::sleep(std::time::Duration::from_millis(5));
             continue;
         }
 
-        // Convert to stereo
-        let loopback_stereo = to_stereo(&loopback_buf, loopback_channels);
-        let mic_stereo = to_stereo(&mic_buf, mic_cfg_channels);
-
-        // Resample mic if needed
-        let mic_final = if need_resample && !mic_stereo.is_empty() {
-            mixer::resample(&mic_stereo, mic_rate, out_rate, 2)
+        let output = if has_loopback && has_mic {
+            let lb: Vec<f32> = loopback_accum.drain(..process_len).collect();
+            let mc: Vec<f32> = mic_accum.drain(..process_len).collect();
+            mixer::mix_streams(&lb, &mc)
+        } else if has_loopback {
+            loopback_accum.drain(..process_len).collect()
         } else {
-            mic_stereo
-        };
-
-        // Mix or use single source
-        let output = if !loopback_stereo.is_empty() && !mic_final.is_empty() {
-            mixer::mix_streams(&loopback_stereo, &mic_final)
-        } else if !loopback_stereo.is_empty() {
-            loopback_stereo
-        } else {
-            mic_final
+            mic_accum.drain(..process_len).collect()
         };
 
         if !output.is_empty() {
             mp3.encode(&output)?;
         }
+    }
+
+    // Flush remaining accumulated samples
+    let remaining = if _loopback_stream.is_some() && _mic_stream.is_some() {
+        let len = loopback_accum.len().min(mic_accum.len());
+        if len > 0 {
+            let lb: Vec<f32> = loopback_accum.drain(..len).collect();
+            let mc: Vec<f32> = mic_accum.drain(..len).collect();
+            mixer::mix_streams(&lb, &mc)
+        } else if !loopback_accum.is_empty() {
+            loopback_accum
+        } else {
+            mic_accum
+        }
+    } else if !loopback_accum.is_empty() {
+        loopback_accum
+    } else {
+        mic_accum
+    };
+
+    if !remaining.is_empty() {
+        mp3.encode(&remaining)?;
     }
 
     mp3.flush()?;

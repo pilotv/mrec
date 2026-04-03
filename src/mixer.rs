@@ -1,12 +1,12 @@
 /// Mix two f32 PCM streams sample-by-sample. Shorter stream is zero-padded.
-/// Output is clamped to [-1.0, 1.0].
+/// Each stream is scaled by 0.5 to prevent clipping, then clamped to [-1.0, 1.0].
 pub fn mix_streams(a: &[f32], b: &[f32]) -> Vec<f32> {
     let len = a.len().max(b.len());
     let mut out = Vec::with_capacity(len);
     for i in 0..len {
         let sa = a.get(i).copied().unwrap_or(0.0);
         let sb = b.get(i).copied().unwrap_or(0.0);
-        out.push((sa + sb).clamp(-1.0, 1.0));
+        out.push((sa * 0.7 + sb * 0.7).clamp(-1.0, 1.0));
     }
     out
 }
