@@ -10,7 +10,7 @@ pub mod settings_ui;
 use config::Config;
 use recorder::Recorder;
 use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-use tray_icon::{Icon, TrayIconBuilder};
+use tray_icon::{Icon, TrayIconBuilder, TrayIconEvent};
 
 fn main() {
     // Load config
@@ -48,6 +48,7 @@ fn main() {
 
     let mut active_recorder: Option<Recorder> = None;
     let menu_rx = MenuEvent::receiver();
+    let tray_rx = TrayIconEvent::receiver();
 
     loop {
         // Pump Win32 messages
@@ -103,6 +104,44 @@ fn main() {
                     let _ = rec.stop();
                 }
                 break;
+            }
+        }
+
+        // Handle tray icon click — toggle recording
+        if let Ok(event) = tray_rx.try_recv() {
+            if matches!(event, TrayIconEvent::Click { button: tray_icon::MouseButton::Left, .. }) {
+                if active_recorder.is_some() {
+                    // Stop recording
+                    if let Some(mut rec) = active_recorder.take() {
+                        match rec.stop() {
+                            Ok(path) => {
+                                tray.set_tooltip(Some(&format!("mrec - saved: {}", path.file_name().unwrap_or_default().to_string_lossy()))).ok();
+                            }
+                            Err(e) => {
+                                show_error(&format!("Error stopping recording:\n{e}"));
+                            }
+                        }
+                    }
+                    item_start.set_enabled(true);
+                    item_stop.set_enabled(false);
+                    item_settings.set_enabled(true);
+                    tray.set_icon(Some(icon_idle.clone())).ok();
+                } else {
+                    // Start recording
+                    match Recorder::start(config.clone()) {
+                        Ok(rec) => {
+                            active_recorder = Some(rec);
+                            item_start.set_enabled(false);
+                            item_stop.set_enabled(true);
+                            item_settings.set_enabled(false);
+                            tray.set_icon(Some(icon_recording.clone())).ok();
+                            tray.set_tooltip(Some("mrec - RECORDING")).ok();
+                        }
+                        Err(e) => {
+                            show_error(&format!("Failed to start recording:\n{e}"));
+                        }
+                    }
+                }
             }
         }
 
