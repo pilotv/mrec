@@ -41,6 +41,7 @@ fn main() {
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
+        .with_menu_on_left_click(false)
         .with_tooltip("mrec - idle")
         .with_icon(icon_idle.clone())
         .build()
