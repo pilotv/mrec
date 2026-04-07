@@ -28,10 +28,14 @@ pub struct Config {
     /// System audio volume: 50..150 (percent, 100 = normal)
     #[serde(default = "default_system_volume")]
     pub system_volume: u32,
+    /// Auto-stop after N minutes of silence (0 = disabled)
+    #[serde(default = "default_silence_timeout")]
+    pub silence_timeout_minutes: u32,
 }
 
 fn default_mic_volume() -> u32 { 150 }
 fn default_system_volume() -> u32 { 100 }
+fn default_silence_timeout() -> u32 { 5 }
 
 impl Default for Config {
     fn default() -> Self {
@@ -49,6 +53,7 @@ impl Default for Config {
             filename_template: "mrec_{date}_{time}".to_string(),
             mic_volume: default_mic_volume(),
             system_volume: default_system_volume(),
+            silence_timeout_minutes: default_silence_timeout(),
         }
     }
 }

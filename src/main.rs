@@ -107,6 +107,26 @@ fn main() {
             }
         }
 
+        // Check for auto-stop (silence timeout)
+        if let Some(ref rec) = active_recorder {
+            if rec.was_auto_stopped() {
+                if let Some(mut rec) = active_recorder.take() {
+                    match rec.stop() {
+                        Ok(path) => {
+                            tray.set_tooltip(Some(&format!("mrec - auto-stopped: {}", path.file_name().unwrap_or_default().to_string_lossy()))).ok();
+                        }
+                        Err(e) => {
+                            show_error(&format!("Error stopping recording:\n{e}"));
+                        }
+                    }
+                }
+                item_start.set_enabled(true);
+                item_stop.set_enabled(false);
+                item_settings.set_enabled(true);
+                tray.set_icon(Some(icon_idle.clone())).ok();
+            }
+        }
+
         // Handle tray icon click — toggle recording
         if let Ok(event) = tray_rx.try_recv() {
             if matches!(event, TrayIconEvent::Click { button: tray_icon::MouseButton::Left, .. }) {

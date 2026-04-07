@@ -18,7 +18,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     // Window
     let mut window = nwg::Window::default();
     nwg::Window::builder()
-        .size((420, 460))
+        .size((420, 500))
         .position((300, 200))
         .title("mrec Settings")
         .flags(nwg::WindowFlags::WINDOW | nwg::WindowFlags::VISIBLE)
@@ -201,11 +201,39 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let micvol_idx = mic_vol_values.iter().position(|&v| v == config_clone.mic_volume).unwrap_or(3);
     cmb_micvol.set_selection(Some(micvol_idx));
 
+    // --- Silence timeout ---
+    let mut lbl_silence = nwg::Label::default();
+    nwg::Label::builder()
+        .text("Silence auto-stop:")
+        .position((10, 255))
+        .size((100, 20))
+        .parent(&window)
+        .build(&mut lbl_silence)
+        .unwrap();
+
+    let silence_options = vec![
+        "Disabled".to_string(), "3 min".to_string(), "5 min".to_string(),
+        "10 min".to_string(), "15 min".to_string(), "30 min".to_string(),
+    ];
+    let silence_values: Vec<u32> = vec![0, 3, 5, 10, 15, 30];
+
+    let mut cmb_silence = nwg::ComboBox::default();
+    nwg::ComboBox::builder()
+        .position((110, 252))
+        .size((100, 200))
+        .collection(silence_options.clone())
+        .parent(&window)
+        .build(&mut cmb_silence)
+        .unwrap();
+
+    let silence_idx = silence_values.iter().position(|&v| v == config_clone.silence_timeout_minutes).unwrap_or(2);
+    cmb_silence.set_selection(Some(silence_idx));
+
     // --- Filename template ---
     let mut lbl_fname = nwg::Label::default();
     nwg::Label::builder()
         .text("Filename:")
-        .position((10, 255))
+        .position((10, 295))
         .size((100, 20))
         .parent(&window)
         .build(&mut lbl_fname)
@@ -214,7 +242,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let mut txt_fname = nwg::TextInput::default();
     nwg::TextInput::builder()
         .text(&config_clone.filename_template)
-        .position((110, 252))
+        .position((110, 292))
         .size((300, 24))
         .parent(&window)
         .build(&mut txt_fname)
@@ -223,7 +251,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let mut lbl_hint = nwg::Label::default();
     nwg::Label::builder()
         .text("Placeholders: {date} = 2026-04-03, {time} = 15-30-00")
-        .position((110, 280))
+        .position((110, 320))
         .size((300, 20))
         .parent(&window)
         .build(&mut lbl_hint)
@@ -233,7 +261,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let mut btn_save = nwg::Button::default();
     nwg::Button::builder()
         .text("Save")
-        .position((220, 410))
+        .position((220, 450))
         .size((90, 32))
         .parent(&window)
         .build(&mut btn_save)
@@ -242,7 +270,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
     let mut btn_cancel = nwg::Button::default();
     nwg::Button::builder()
         .text("Cancel")
-        .position((320, 410))
+        .position((320, 450))
         .size((90, 32))
         .parent(&window)
         .build(&mut btn_cancel)
@@ -290,6 +318,10 @@ pub fn show_settings(current: &Config) -> Option<Config> {
                         .and_then(|i| mic_vol_values.get(i).copied())
                         .unwrap_or(150);
 
+                    let silence_timeout_minutes = cmb_silence.selection()
+                        .and_then(|i| silence_values.get(i).copied())
+                        .unwrap_or(5);
+
                     let new_config = Config {
                         output_dir: PathBuf::from(txt_folder.text()),
                         bitrate,
@@ -298,6 +330,7 @@ pub fn show_settings(current: &Config) -> Option<Config> {
                         filename_template: txt_fname.text(),
                         mic_volume,
                         system_volume,
+                        silence_timeout_minutes,
                     };
                     *result_clone.borrow_mut() = Some(new_config);
                     nwg::stop_thread_dispatch();

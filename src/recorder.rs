@@ -12,18 +12,22 @@ use std::thread;
 
 pub struct Recorder {
     stop_flag: Arc<AtomicBool>,
+    auto_stopped: Arc<AtomicBool>,
     thread_handle: Option<thread::JoinHandle<Result<PathBuf, String>>>,
 }
 
 impl Recorder {
     pub fn start(config: Config) -> Result<Self, String> {
         let stop_flag = Arc::new(AtomicBool::new(false));
+        let auto_stopped = Arc::new(AtomicBool::new(false));
         let stop_clone = stop_flag.clone();
+        let auto_stopped_clone = auto_stopped.clone();
 
-        let thread_handle = thread::spawn(move || run_recording(stop_clone, config));
+        let thread_handle = thread::spawn(move || run_recording(stop_clone, auto_stopped_clone, config));
 
         Ok(Self {
             stop_flag,
+            auto_stopped,
             thread_handle: Some(thread_handle),
         })
     }
@@ -40,6 +44,10 @@ impl Recorder {
     pub fn is_recording(&self) -> bool {
         !self.stop_flag.load(Ordering::Relaxed)
     }
+
+    pub fn was_auto_stopped(&self) -> bool {
+        self.auto_stopped.load(Ordering::Relaxed)
+    }
 }
 
 impl Drop for Recorder {
@@ -51,7 +59,7 @@ impl Drop for Recorder {
     }
 }
 
-fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, String> {
+fn run_recording(stop_flag: Arc<AtomicBool>, auto_stopped: Arc<AtomicBool>, config: Config) -> Result<PathBuf, String> {
     fs::create_dir_all(&config.output_dir).map_err(|e| format!("create dir: {e}"))?;
 
     let file_path = config.output_dir.join(config.format_filename());
@@ -117,6 +125,11 @@ fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, 
     let mut loopback_accum: Vec<f32> = Vec::with_capacity(chunk_samples * 2);
     let mut mic_accum: Vec<f32> = Vec::with_capacity(chunk_samples * 2);
 
+    // Silence detection
+    let silence_timeout = config.silence_timeout_minutes;
+    let silence_threshold: f32 = 0.005; // ~ -46 dB
+    let mut last_sound_time = std::time::Instant::now();
+
     // Recording loop
     while !stop_flag.load(Ordering::Relaxed) {
         // Drain available loopback samples into accumulator
@@ -179,7 +192,22 @@ fn run_recording(stop_flag: Arc<AtomicBool>, config: Config) -> Result<PathBuf, 
         };
 
         if !output.is_empty() {
+            // Check if audio exceeds silence threshold
+            let peak = output.iter().fold(0.0f32, |mx, &s| mx.max(s.abs()));
+            if peak > silence_threshold {
+                last_sound_time = std::time::Instant::now();
+            }
+
             mp3.encode(&output)?;
+        }
+
+        // Auto-stop on prolonged silence
+        if silence_timeout > 0 {
+            let elapsed = last_sound_time.elapsed().as_secs();
+            if elapsed >= (silence_timeout as u64) * 60 {
+                auto_stopped.store(true, Ordering::Relaxed);
+                break;
+            }
         }
     }
 
